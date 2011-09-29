@@ -1,0 +1,54 @@
+
+
+sudo apt-get update
+sudo apt-get upgrade
+sudo apt-get install aptitude aptitude-gtk
+sudo apt-get install build-essential scons curl rpm git-all vim vim-doc
+sudo apt-get install smplayer chmsee unrar
+
+# ruby on rails env
+sudo apt-get install ruby-full rubygems rails
+
+sudo apt-get install imagemagick sqlite3 libsqlite3-dev libsqlite3-ruby 
+
+sudo gem install sqlite3-ruby
+
+sudo gem install rake rack rmysqldump rails-dbd-mysql rdbi-driver-mysql mysqlplus mysql_backup
+
+
+sudo gem install spidr json ruport ruport-util coderay ruby-paypal rubyzip thin pony ruby-prof reek httparty rubyjson facter thin httpclient RedCloth 
+
+sudo gem install rdoc-data
+
+
+
+mysql_mirror mysql_replication_adapter mysql_replication_monitor mysql_replication_status mysql_retry_lost_connection mysql_schema_bulk_change
+
+
+ire9@fire9-OEM:~/桌面$ sudo gem install arcadia
+RDoc 2.5 did not save method parameters, so you should upgrade your rdoc-data
+gem to a version >= 2.5.3.
+
+To have ri data for core and stdlib you'll need to:
+
+  gem install rdoc-data
+
+then run:
+
+  rdoc-data --install
+
+To have ri data for you gems you'll also need to run:
+
+  gem rdoc --all --overwrite
+
+If you don't want to rebuild the rdoc for `gem server`, add --no-rdoc.
+
+ERROR:  Could not find a valid gem 'Prawn' (>= 0) in any repository
+ERROR:  Could not find a valid gem 'rubysh' (>= 0) in any repository
+ERROR:  Could not find a valid gem 'Clogger' (>= 0) in any repository
+ERROR:  Could not find a valid gem 'ruby-pdns' (>= 0) in any repository
+ERROR:  Could not find a valid gem 'nginxr' (>= 0) in any repository
+ERROR:  Could not find a valid gem 'rubyjson' (>= 0) in any repository
+ERROR:  Could not find a valid gem 'RMagick' (>= 0) in any repository
+
+

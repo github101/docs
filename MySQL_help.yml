@@ -1,0 +1,344 @@
+mysql> help contents
+You asked for help about help category: "Contents"
+For more information, type 'help <item>', where <item> is one of the following
+categories:
+   Account Management
+   Administration
+   Compound Statements
+   Data Definition
+   Data Manipulation
+   Data Types
+   Functions
+   Functions and Modifiers for Use with GROUP BY
+   Geographic Features
+   Language Structure
+   Plugins
+   Table Maintenance
+   Transactions
+   User-Defined Functions
+   Utility
+---------------------------------------------------------------------------------
+mysql> help Account Management
+You asked for help about help category: "Account Management"
+For more information, type 'help <item>', where <item> is one of the following
+topics:
+   CREATE USER
+   DROP USER
+   GRANT
+   RENAME USER
+   REVOKE
+   SET PASSWORD
+
+mysql> help Administration
+You asked for help about help category: "Administration"
+For more information, type 'help <item>', where <item> is one of the following
+topics:
+   BINLOG
+   CACHE INDEX
+   CHANGE MASTER TO
+   DEALLOCATE PREPARE
+   EXECUTE STATEMENT
+   FLUSH
+   FLUSH QUERY CACHE
+   HELP COMMAND
+   KILL
+   LOAD DATA FROM MASTER
+   LOAD INDEX
+   LOAD TABLE FROM MASTER
+   PREPARE
+   PURGE BINARY LOGS
+   RESET
+   RESET MASTER
+   RESET SLAVE
+   SET
+   SET GLOBAL SQL_SLAVE_SKIP_COUNTER
+   SET SQL_LOG_BIN
+   SHOW
+   SHOW AUTHORS
+   SHOW BINARY LOGS
+   SHOW BINLOG EVENTS
+   SHOW CHARACTER SET
+   SHOW COLLATION
+   SHOW COLUMNS
+   SHOW CONTRIBUTORS
+   SHOW CREATE DATABASE
+   SHOW CREATE EVENT
+   SHOW CREATE FUNCTION
+   SHOW CREATE PROCEDURE
+   SHOW CREATE TABLE
+   SHOW CREATE TRIGGER
+   SHOW CREATE VIEW
+   SHOW DATABASES
+   SHOW ENGINE
+   SHOW ENGINES
+   SHOW ERRORS
+   SHOW EVENTS
+   SHOW FUNCTION CODE
+   SHOW FUNCTION STATUS
+   SHOW GRANTS
+   SHOW INDEX
+   SHOW INNODB STATUS
+   SHOW MASTER STATUS
+   SHOW OPEN TABLES
+   SHOW PLUGINS
+   SHOW PRIVILEGES
+   SHOW PROCEDURE CODE
+   SHOW PROCEDURE STATUS
+   SHOW PROCESSLIST
+   SHOW PROFILE
+   SHOW PROFILES
+   SHOW SLAVE HOSTS
+   SHOW SLAVE STATUS
+   SHOW STATUS
+   SHOW TABLE STATUS
+   SHOW TABLES
+   SHOW TRIGGERS
+   SHOW VARIABLES
+   SHOW WARNINGS
+   START SLAVE
+   STOP SLAVE
+
+mysql> help compound Statements
+You asked for help about help category: "Compound Statements"
+For more information, type 'help <item>', where <item> is one of the following
+topics:
+   BEGIN END
+   CASE STATEMENT
+   CLOSE
+   DECLARE CONDITION
+   DECLARE CURSOR
+   DECLARE HANDLER
+   DECLARE VARIABLE
+   FETCH
+   IF STATEMENT
+   ITERATE
+   LEAVE
+   LOOP
+   OPEN
+   REPEAT LOOP
+   RETURN
+   SELECT INTO
+   SET VARIABLE
+   WHILE
+
+mysql> help Data Definition
+You asked for help about help category: "Data Definition"
+For more information, type 'help <item>', where <item> is one of the following
+topics:
+   ALTER DATABASE
+   ALTER EVENT
+   ALTER FUNCTION
+   ALTER LOGFILE GROUP
+   ALTER PROCEDURE
+   ALTER SERVER
+   ALTER TABLE
+   ALTER TABLESPACE
+   ALTER VIEW
+   CONSTRAINT
+   CREATE DATABASE
+   CREATE EVENT
+   CREATE FUNCTION
+   CREATE INDEX
+   CREATE PROCEDURE
+   CREATE SERVER
+   CREATE TABLE
+   CREATE TABLESPACE
+   CREATE TRIGGER
+   CREATE VIEW
+   DROP DATABASE
+   DROP EVENT
+   DROP FUNCTION
+   DROP INDEX
+   DROP PROCEDURE
+   DROP SERVER
+   DROP TABLE
+   DROP TABLESPACE
+   DROP TRIGGER
+   DROP VIEW
+   MERGE
+   RENAME TABLE
+
+mysql> help Data Manipulation
+You asked for help about help category: "Data Manipulation"
+For more information, type 'help <item>', where <item> is one of the following
+topics:
+   CALL
+   DELETE
+   DO
+   DUAL
+   HANDLER
+   INSERT
+   INSERT DELAYED
+   INSERT SELECT
+   JOIN
+   LOAD DATA
+   REPLACE
+   SELECT
+   TRUNCATE TABLE
+   UNION
+   UPDATE
+
+mysql> help Data Types
+You asked for help about help category: "Data Types"
+For more information, type 'help <item>', where <item> is one of the following
+topics:
+   AUTO_INCREMENT
+   BIGINT
+   BINARY
+   BIT
+   BLOB
+   BLOB DATA TYPE
+   BOOLEAN
+   CHAR
+   CHAR BYTE
+   DATE
+   DATETIME
+   DEC
+   DECIMAL
+   DOUBLE
+   DOUBLE PRECISION
+   ENUM
+   FLOAT
+   INT
+   INTEGER
+   LONGBLOB
+   LONGTEXT
+   MEDIUMBLOB
+   MEDIUMINT
+   MEDIUMTEXT
+   SET DATA TYPE
+   SMALLINT
+   TEXT
+   TIME
+   TIMESTAMP
+   TINYBLOB
+   TINYINT
+   TINYTEXT
+   VARBINARY
+   VARCHAR
+   YEAR DATA TYPE
+mysql> help functions
+You asked for help about help category: "Functions"
+For more information, type 'help <item>', where <item> is one of the following
+topics:
+   PROCEDURE ANALYSE
+categories:
+   Bit Functions
+   Comparison operators
+   Control flow functions
+   Date and Time Functions
+   Encryption Functions
+   Information Functions
+   Logical operators
+   Miscellaneous Functions
+   Numeric Functions
+   String Functions
+
+mysql> help functions and modifiers for use with group by
+You asked for help about help category: "Functions and Modifiers for Use with GROUP BY"
+For more information, type 'help <item>', where <item> is one of the following
+topics:
+   AVG
+   BIT_AND
+   BIT_OR
+   BIT_XOR
+   COUNT
+   COUNT DISTINCT
+   GROUP_CONCAT
+   MAX
+   MIN
+   STD
+   STDDEV
+   STDDEV_POP
+   STDDEV_SAMP
+   SUM
+   VARIANCE
+   VAR_POP
+   VAR_SAMP
+
+mysql> help geographic features
+You asked for help about help category: "Geographic Features"
+For more information, type 'help <item>', where <item> is one of the following
+topics:
+   GEOMETRY
+   GEOMETRY HIERARCHY
+   SPATIAL
+categories:
+   Geometry constructors
+   Geometry properties
+   Geometry relations
+   LineString properties
+   MBR
+   Point properties
+   Polygon properties
+   WKB
+   WKT
+
+mysql> help language structure
+Name: 'Language Structure'
+Description:
+TRUE FALSEExamples:
+N
+mysql> help plugins
+Name: 'SHOW PLUGINS'
+Description:
+Syntax:
+SHOW PLUGINS
+
+SHOW PLUGINS displays information about known plugins.
+
+mysql> SHOW PLUGINS;
++------------+--------+----------------+---------+
+| Name       | Status | Type           | Library |
++------------+--------+----------------+---------+
+| MEMORY     | ACTIVE | STORAGE ENGINE | NULL    |
+| MyISAM     | ACTIVE | STORAGE ENGINE | NULL    |
+| InnoDB     | ACTIVE | STORAGE ENGINE | NULL    |
+| ARCHIVE    | ACTIVE | STORAGE ENGINE | NULL    |
+| CSV        | ACTIVE | STORAGE ENGINE | NULL    |
+| BLACKHOLE  | ACTIVE | STORAGE ENGINE | NULL    |
+| FEDERATED  | ACTIVE | STORAGE ENGINE | NULL    |
+| MRG_MYISAM | ACTIVE | STORAGE ENGINE | NULL    |
++------------+--------+----------------+---------+
+
+URL: http://dev.mysql.com/doc/refman/5.1/en/show-plugins.html
+
+
+mysql> help table maintenance
+You asked for help about help category: "Table Maintenance"
+For more information, type 'help <item>', where <item> is one of the following
+topics:
+   ANALYZE TABLE
+   BACKUP TABLE
+   CHECK TABLE
+   CHECKSUM TABLE
+   OPTIMIZE TABLE
+   REPAIR TABLE
+   RESTORE TABLE
+
+mysql> help transactions
+You asked for help about help category: "Transactions"
+For more information, type 'help <item>', where <item> is one of the following
+topics:
+   ISOLATION
+   LOCK
+   SAVEPOINT
+   START TRANSACTION
+
+mysql> help user-defined functions
+You asked for help about help category: "User-Defined Functions"
+For more information, type 'help <item>', where <item> is one of the following
+topics:
+   CREATE FUNCTION UDF
+   DROP FUNCTION UDF
+
+mysql> help utility
+You asked for help about help category: "Utility"
+For more information, type 'help <item>', where <item> is one of the following
+topics:
+   DESCRIBE
+   EXPLAIN
+   HELP STATEMENT
+   USE
+-------------------------------------------------------------------------------
+

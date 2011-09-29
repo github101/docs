@@ -1,0 +1,228 @@
+搭建Ubuntu的更新源服务器的方法主要有apt-mirror和sync，本文主要介绍第一种方法，此方法简单易做。安装前首先要准备好一台可以联网的服务器，硬盘空间80G以上，安装Linux操作系统。
+
+主要步骤如下。
+
+1、安装apt-mirror
+
+apt-mirror可从下面的地址获得
+http://apt-mirror.sourceforge.net/apt-mirror/apt-mirror_0.4.8.orig.tar.gz
+或者安装Ubuntu的apt-mirror可执行包
+https://launchpad.net/Ubuntu/lucid/+package/apt-mirror
+
+$tar xzvf apt-mirror_0.4.8.orig.tar.gz
+$cd apt-mirror-0.4.8
+$cp apt-mirror /bin
+$mkdir -p /etc/apt
+$cp mirror.list /etc/apt
+
+该安装文件中有个postmirror.sh，这是放在镜像目录的var目录下的，apt-mirror命令执行后会自动执行改脚本内容，默认的postmirror.sh什么也没有做，www.linuxidc.com如果你需要额外安装一些软件包或者其他目的，可以将脚本加在此处。
+
+2、修改mirror.list
+
+$vi /etc/apt/mirror.list
+
+############# Config ##################
+#
+## default configuration options (uncomment and change to override)
+#
+#set base_path /var/spool/apt-mirror
+#
+## if you change the base path you must create the directories below with write privlages
+#
+#set mirror_path $base_path/mirror
+#set skel_path $base_path/skel
+#set var_path $base_path/var
+#set cleanscript $var_path/clean.sh
+#
+#set defaultarch <running host architecture>
+#set nthreads 20
+#set _tilde 0
+#
+## valid values for limit_rate are :
+## 10 for 10 Bytes/Second, 10k for 10 Kilobytes/Second, and 10m for 10 Megabytes/Second
+#
+#set limit_rate 100m
+#
+############# End Config ##############
+
+######### Mirroring List ##############
+#
+# supported apt-mirror list entries:
+#
+# debian source : deb-src http://...
+# default native arch : deb http://...
+# debian non-native arch : deb-$arch http://...
+# where $arch can = (alpha|amd64|armel|arm|hppa|hurd-i386|i386|ia64|lpia|m68k|mipsel|mips|powerpc|s390|sh|sparc)
+#
+
+deb http://ftp.us.debian.org/debian unstable main contrib non-free
+deb-src http://ftp.us.debian.org/debian unstable main contrib non-free
+
+#
+######### End Mirroring List ##########
+
+######### Cleaning Section ############
+#
+
+## directorys managed by apt-mirror
+clean http://ftp.us.debian.org/debian
+
+## directorys NOT managed by apt-mirror
+
+
+#skip-clean http://ftp.us.debian.org/debian-minicd/
+#skip-clean http://ftp.us.debian.org/debian/dists/sarge/main/installer-i386/
+#skip-clean http://ftp.us.debian.org/debian/dists/sid/main/installer-i386/
+
+红色是需要被替换掉的部分。 base_path表示你的镜像目录,默认是/var/spool/apt-mirror,
+
+你也可以取消前面的注释并改成自定义的目录。我发现修改后就不能用,最后采用链接方法解决的。
+
+比如:
+
+$cd /var/spool
+
+$ln -s /Ubuntu apt-mirror
+
+如果需要安装Ubuntu 10.04，则从网络中找一个离自己最近的源,修改mirror.lst的内容,将源复制进来。
+因为我这边的环境是教育网,离成都电子科技大学很近,所以就采用的成都电子科技大学源。
+如下。
+
+deb http://Ubuntu.uestc.edu.cn/ubuntu lucid main restricted universe multiverse
+deb http://Ubuntu.uestc.edu.cn/ubuntu lucid-backports main restricted universe multiverse
+deb http://Ubuntu.uestc.edu.cn/ubuntu lucid-proposed main restricted universe multiverse
+deb http://Ubuntu.uestc.edu.cn/ubuntu lucid-security main restricted universe multiverse
+deb http://Ubuntu.uestc.edu.cn/ubuntu lucid-updates main restricted universe multiverse
+deb-src http://Ubuntu.uestc.edu.cn/ubuntu lucid main restricted universe multiverse
+deb-src http://Ubuntu.uestc.edu.cn/ubuntu lucid-backports main restricted universe multiverse
+deb-src http://Ubuntu.uestc.edu.cn/ubuntu lucid-proposed main restricted universe multiverse
+deb-src http://Ubuntu.uestc.edu.cn/ubuntu lucid-security main restricted universe multiverse
+deb-src http://Ubuntu.uestc.edu.cn/ubuntu lucid-updates main restricted universe multiverse
+
+clean http://Ubuntu.uestc.edu.cn/ubuntu
+
+将这些行代替上面的红色文字,保存后退出。
+
+3、开始下载
+输入apt-mirror即开始从电子科技大学服务器源制作镜像。
+
+这里很容易出错，我的错误如下：
+
+
+$ apt-mirror
+Downloading 32 index files using 20 threads...
+Begin time: Mon Nov 24 09:02:03 2008
+[20]... [19]... [18]... [17]... [16]... [15]... [14]... [13]... [12]... [11]... [10]... [9]... [8]... [7]... [6]... [5]... [4]... [3]... [2]... [1]... [0]...
+
+End time: Mon Nov 24 09:02:03 2008
+Proceed indexes: [Psh: cannot open au.archive.Ubuntu.com/ubuntu//dists/intrepid/main/binary-i386/Packages.gz: No such file
+apt-mirror: can't open index in proceed_index_gz at /usr/bin/apt-mirror line 390.
+
+错误原因很多。归根结底都是源的写法错误或者源错误。为了排除此错误浪费了我很长时间，最终发现居然是因为在window下复制的文本不能被识别。后来改用Linux系统后就好了。成功后，就会显示如下的内容：
+
+root@node8:/var/spool # apt-mirror
+Downloading 140 index files using 30 threads...
+Begin time: Wed Jul 21 21:27:52 2010
+[30]... [29]... [28]... [27]... [26]... [25]... [24]... [23]... [22]... [21]... [20]... [19]... [18]... [17]... [16]... [15]... [14]... [13]... [12]... [11]... [10]... [9]... [8]... [7]... [6]... [5]... [4]... [3]... [2]... [1]... [0]...
+End time: Wed Jul 21 21:28:00 2010
+
+Proceed indexes: [SSSSSPPPPP]
+
+68.1 GiB will be downloaded into archive.
+Downloading 85118 archive files using 30 threads...
+Begin time: Wed Jul 21 21:28:16 2010
+[30]... [29]... [28]...
+
+这里的时间根据网络状况决定。从上面可以看到，一共要下载68G的内容。
+
+完成后，最好将镜像目录的权限弄成755,以防客户端下载中因为权限问题而失败。
+
+chmod -R 755 /Ubuntu
+
+4 修补源
+下载完成后，客户机如果要从PXE安装ubutnu，还需要下载一些文件。对于下载哪些文件，也许对于每个版本，每个源都不同。
+
+对于Ubuntu 10.04，需要下载3个额外软件包列表。分别是：
+
+lucid/main/debian-installer/binary-i386/Packages.gz
+lucid/restricted/debian-installer/binary-i386/Packages.gz
+
+lucid-updates/main/debian-installer/binary-i386/Packages.gz
+    这些列表中所列出的软件默认的apt-mirror没有镜像复制它们，因此额外的下载他们，可以从你镜像的服务器地址上来下载。我已经将下载过程制作成了脚本，内容如下。其中$server表示源镜像的Ubuntu地址。$version表示ubuntu的版本,$client表示你的apt-mirror镜像后的ubuntu目录。默认是采用成都电子科技大学源为服务器，/ubuntu/mirror/ubuntu.uestc.edu.cn/ubuntu为镜像目录，安装ubuntu 10.04。下面的脚本可以放在apt-mirror镜像var目录的postmirror.sh中来执行，也可以单独来执行。
+
+
+#!/bin/sh
+if [ -z $1 ]
+then
+      server=http://Ubuntu.uestc.edu.cn/ubuntu
+      else
+      server=$1
+fi
+if [ -z $2 ]
+then
+      version=lucid
+else
+      version=$2
+fi
+if [ -z $3 ]
+then
+      client=/Ubuntu/mirror/ubuntu.uestc.edu.cn/ubuntu
+else
+      client=$3
+fi
+wget $server/dists/$version/main/debian-installer/binary-i386/Packages.gz
+gunzip -f Packages.gz
+for i in $(sed -n '/^Filename:/p' Packages|awk '{print $2}')
+do
+   cd $client
+   j=${i%\/*}
+   cd $j
+   wget $server/$i
+   chmod 755 $client/$i
+done
+
+wget $server/dists/$version-updates/main/debian-installer/binary-i386/Packages.gz
+gunzip -f Packages.gz
+for i in $(sed -n '/^Filename:/p' Packages|awk '{print $2}')
+do
+   cd $client
+   j=${i%\/*}
+   cd $j
+   wget $server/$i
+   chmod 755 $client/$i
+done
+
+wget $server/dists/$version/restricted/debian-installer/binary-i386/Packages.gz
+gunzip -f Packages.gz
+for i in $(sed -n '/^Filename:/p' Packages|awk '{print $2}')
+do
+   cd $client
+   j=${i%\/*}
+   cd $j
+   wget $server/$i
+   chmod 755 $client/$i
+done
+
+5 客户端安装。
+客户端选择从PXE启动，PXE环境的配置不再详述。
+网络配置完成后选择手动选择镜像地址，并输入服务器地址和服务器目录(Ubuntu)。
+
+安装完成后,修改/etc/apt/sources.list,将其它的外网源去掉。
+至此，Ubuntu PXE安装已经配置成功了。
+
+6 httpd错误解决
+
+如果访问http://yourip/Ubuntu出现在permission denied。
+则在/etc/httpd/conf/httpd.conf中相应选项增加或修改为下面的形式。
+
+<Location /Ubuntu>
+    Order allow,deny
+    Allow from all
+</Location>
+
+<Directory />
+    Options FollowSymLinks MultiViews
+    AllowOverride None
+    Order allow,deny
+    allow from all
+</Directory>

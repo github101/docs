@@ -1,0 +1,917 @@
+OS: CentOS-4
+Nagios-2.9
+
+1）Nagios installation
+
+Remove old nagios installation: 
+rpm -qa|grep nagios; rpm -e ...
+
+## create group & user for nagios
+groupadd -g 50001 nagios
+useradd -u 50001 -g 50001 -d /home/nagios -s /sbin/nologin nagios
+
+# Reauire:
+	gd && gd-devel
+	libpng && libpng-devel
+	libjpeg && libjpeg-devel
+
+	#####download source package of Python
+	wget http://nchc.dl.sourceforge.net/sourceforge/nagios/nagios-2.9.tar.gz
+	tar zxvf nagios-2.9.tar.gz
+	cd nagios-2.9
+	./configure --prefix=/opt/nagios \
+				--with-cgiurl=/nagios/cgi-bin \
+				--with-htmurl=/nagios \
+				--with-nagios-user=nagios \
+				--with-nagios-group=nagios
+
+	make all
+	make install
+	make install-init
+	make install-commandmode
+	make install-config
+
+	chown -R nagios.nagios /opt/nagios
+
+2) nagios-plugins installation
+
+	#####download source package of nagios-plugins
+	wget http://downloads.sourceforge.net/nagiosplug/nagios-plugins-1.4.9.tar.gz?modtime=1180952247&big_mirror=0
+	tar zxvf nagios-plugins-1.4.9.tar.gz
+	cd nagios-plugins-1.4.9
+	./configure --prefix=/opt/nagios \
+				--with-cgiurl=nagios/cgi-bin \
+				--with-mysql=/opt/mysql/bin/mysql_config \
+				--enable-ssl \
+				--enable-command-args
+
+	make
+	make install
+
+
+3) configure
+	cd /opt/nagios
+	rsync -av etc etc-orig
+	cd /opt/nagios/etc
+	for i in `ls -la |awk '{print $9}'`; do mv  $i `echo $i|awk -F- '{print $1}'`; done   #将.cfg-sample的文件复制为.cfg文件
+
+
+4) configure the web server
+	## this example base the nginx
+	----------------------------------------------------------
+	server {
+		listen       192.168.0.220:8804;
+		server_name  192.168.0.220:8804;
+
+		access_log  /var/log/nginx/nagios/nagios_access_log  combined;
+		error_log   /var/log/nginx/nagios/nagios_error_log notice;
+
+		location /nagios {
+			alias   /opt/nagios/share;
+			auth_basic              "Restricted";
+			auth_basic_user_file    /opt/nagios/etc/htpasswd.user;
+		}
+
+		location ~ \.cgi$ {
+			root /opt/nagios/sbin;
+			rewrite ^/nagios/cgi-bin/(.*)\.cgi /$1.cgi break;
+			fastcgi_index index.cgi;
+			auth_basic              "Restricted";
+			auth_basic_user_file    /opt/nagios/etc/htpasswd.user;
+
+			fastcgi_pass    unix:/var/run/fcgi/nagios.sock;
+			#fastcgi_pass   192.168.0.220:8804;
+
+			fastcgi_param   SCRIPT_FILENAME			/opt/nagios/sbin$fastcgi_script_name;
+			fastcgi_param   QUERY_STRING			$query_string;
+
+			fastcgi_param   REMOTE_ADDR				$remote_addr;
+			fastcgi_param   REMOTE_PORT				$remote_port;
+			fastcgi_param   REQUEST_METHOD			$request_method;
+			fastcgi_param   REQUEST_URI				$request_uri;
+
+			#fastcgi_param  SCRIPT_NAME				$fastcgi_script_name;
+			fastcgi_param   SERVER_ADDR				$server_addr;
+			fastcgi_param   SERVER_NAME				$server_name;
+			fastcgi_param   SERVER_PORT				$server_port;
+			fastcgi_param   SERVER_PROTOCOL			$server_protocol;
+			fastcgi_param   SERVER_SOFTWARE			nginx;
+
+			fastcgi_param   CONTENT_LENGTH			$content_length;
+			fastcgi_param   CONTENT_TYPE			$content_type;
+			fastcgi_param   GATEWAY_INTERFACE		CGI/1.1;
+			fastcgi_param   HTTP_ACCEPT_ENCODING	gzip,deflate;
+			fastcgi_param   HTTP_ACCEPT_LANGUAGE	zh-cn;
+			#include        conf/fastcgi_params;
+		}
+	}
+	----------------------------------------------------------
+
+	## If you want nginx support the cgi,you can use below script "perl-cgi.pl"
+	----------------------------------------------------------
+	#!/usr/bin/perl
+
+	use FCGI;
+	#perl -MCPAN -e 'install FCGI'
+	use Socket;
+
+	#this keeps the program alive or something after exec'ing perl scripts
+	END() { } BEGIN() { }
+	*CORE::GLOBAL::exit = sub { die "fakeexit\nrc=".shift()."\n"; }; eval q{exit}; if ($@) { exit unless $@ =~ /^fakeexit/; } ;
+
+	&main;
+
+	sub main {
+			#$socket = FCGI::OpenSocket( ":3461", 10 ); #use IP sockets
+			$socket = FCGI::OpenSocket( "/var/run/fcgi/nagios.sock", 10 ); #use UNIX sockets - user running this script must have w access to the 'nginx' folder!!
+			$request = FCGI::Request( \*STDIN, \*STDOUT, \*STDERR, \%ENV, $socket );
+			if ($request) {request_loop()};
+				FCGI::CloseSocket( $socket );
+	}
+
+	sub request_loop {
+			while( $request->Accept() >= 0 ) {
+
+			   #processing any STDIN input from WebServer (for CGI-GET actions)
+			   $env = $request->GetEnvironment();
+			   $stdin_passthrough ='';
+			   $req_len = 0 + $ENV{CONTENT_LENGTH};
+			   if ($ENV{REQUEST_METHOD} eq 'GET'){
+					$stdin_passthrough .= $ENV{'QUERY_STRING'};
+				}
+
+				#running the cgi app
+				if ( (-x $ENV{SCRIPT_FILENAME}) &&  #can I execute this?
+					 (-s $ENV{SCRIPT_FILENAME}) &&  #Is this file empty?
+					 (-r $ENV{SCRIPT_FILENAME})     #can I read this file?
+				){
+					#http://perldoc.perl.org/perlipc.html#Safe-Pipe-Opens
+			open $cgi_app, '-|', $ENV{SCRIPT_FILENAME}, $stdin_passthrough or print("Content-type: text/plain\r\n\r\n"); print "Error: CGI app returned no output - Executing $ENV{SCRIPT_FILENAME} failed !\n";
+					if ($cgi_app) {print <$cgi_app>; close $cgi_app;}
+				}
+				else {
+					print("Content-type: text/plain\r\n\r\n");
+					print "Error: No such CGI app - $req_len  - $ENV{CONTENT_LENGTH} - $ENV{REQUEST_METHOD} - $ENV{SCRIPT_FILENAME} may not exist or is not executable by this process.\n";
+				}
+
+			}
+	}
+	# EOF: perl-cgi.pl
+	----------------------------------------------------------
+
+	## start up script,get the /var/run/fcgi/nagios.sock
+	## Note: the nagios.sock must be web.web
+	----------------------------------------------------------
+
+	#!/bin/bash
+
+	## start_nginx_cgi.sh: start nginx cgi mode
+	## ljzhou, 2007.08.20
+
+
+	PERL="/usr/bin/perl"
+	NGINX_CGI_FILE="/opt/nagios/bin/perl-cgi.pl"
+
+
+	#bg_num=`jobs -l |grep "NGINX_CGI_FILE"`
+	#PID=`ps aux|grep "perl-cgi"|cut -c10-14|xargs kill -9`
+	PID=`ps aux|grep 'perl-cgi'|cut -c10-14|sed -n "1P"`
+	echo $PID
+	sockfiles="/var/run/fcgi/nagios.sock"
+	kill -9 $PID
+
+	$PERL $NGINX_CGI_FILE &
+
+	sleep 3
+
+	`chown web.web $sockfiles`
+
+	# EOF: start_nginx_cgi.sh
+
+	----------------------------------------------------------
+
+
+5) 
+	## 根据具体使用情况,将配置文件的结构做以下规划,为了方便将来的维护和管理:
+	
+	## 配置文件结构如下:
+	etc/	|-- cgi.cfg
+			|-- commands.cfg
+			|-- nagios.cfg
+			|-- resource.cfg
+	(以上为nagios系统主配置文件)
+
+	etc/servers	|-- contacts.cfg		管理人员和管理人员组的的默认初始化设定文件
+				|-- hostgroups.cfg		服务器组的默认初始化设定文件
+				|-- hosts.cfg			服务器的默认初始化设定文件
+				|-- services.cfg		监控服务的默认初始化设定文件
+				|-- servicegroups.cfg	监控服务组的默认初始化设定文件
+				|-- timeperiod.cfg		时间周期默认初始化设定文件
+	(以上为监控服务相关的配置文件,都是由原localhost.cfg文件中拆分出来的,这样方面理解和管理)
+
+	etc/servers/abc.com		|-- 192.168.0.220.cfg
+									|-- 192.168.0.233.cfg
+	(在etc/servers/下建立监控的域名目录,区分各个被监控的域名,每台监控的主机一个单独的配置文件,包含hosts和services的内容)
+
+
+	1) ## 设置 cgi.cfg :
+		authorized_for_system_information=nagiosadmin
+		authorized_for_configuration_information=nagiosadmin
+		authorized_for_system_commands=nagiosadmin
+		authorized_for_all_services=nagiosadmin
+		authorized_for_all_hosts=nagiosadmin
+		authorized_for_all_service_commands=nagiosadmin
+		authorized_for_all_host_commands=nagiosadmin
+
+	## 以上设定nagiosadmin为nagios最高权限,有权查看所有hosts和services的状态.
+
+	2) ## 设置nagios.cfg :
+		#cfg_file=/opt/nagios/etc/localhost.cfg
+		#cfg_file=/opt/nagios/etc/contactgroups.cfg
+		#cfg_file=/opt/nagios/etc/contacts.cfg
+		#cfg_file=/opt/nagios/etc/dependencies.cfg
+		#cfg_file=/opt/nagios/etc/escalations.cfg
+		#cfg_file=/opt/nagios/etc/hostgroups.cfg
+		#cfg_file=/opt/nagios/etc/hosts.cfg
+		#cfg_file=/opt/nagios/etc/services.cfg
+		#cfg_file=/opt/nagios/etc/timeperiods.cfg
+		## 将以上内容注释掉
+
+		cfg_dir=/opt/nagios/etc/servers
+		## 开启该参数,表示将/opt/nagios/etc/servers下的所有.cfg配置文件都加载到nagios.
+
+	3) ## 配置command.cfg，支持email,sms通知方式：
+		----------------------------------------------------------
+		# 'host-notify-by-email' command definition
+		define command{
+			command_name    host-notify-by-email
+			command_line    /opt/nagios/bin/mail_send.sh "Host $HOSTSTATE$ alert for $HOSTNAME$!" "***** Nagios *****\n\nNotification Type:$NOTIFICATIONTYPE$\nHost: $HOSTNAME$\nState: $HOSTSTATE$\nAddress:$HOSTADDRESS$\nInfo: $HOSTOUTPUT$\n\nDate/Time: $LONGDATETIME$\n" $CONTACTEMAIL$
+		}
+
+		# 'notify-by-email' command definition
+		define command{
+			command_name    notify-by-email
+			command_line    /opt/nagios/bin/mail_send.sh "**$NOTIFICATIONTYPE$ alert - $HOSTALIAS$/$SERVICEDESC$ is $SERVICESTATE$ **" "***** Nagios *****\n\nNotification Type:$NOTIFICATIONTYPE$\n\nService: $SERVICEDESC$\nHost:$HOSTALIAS$\nAddress: $HOSTADDRESS$\nState:$SERVICESTATE$\n\nDate/Time: $LONGDATETIME$\n\nAdditionalInfo:\n\n$SERVICEOUTPUT$" $CONTACTEMAIL$
+		}
+
+		# 'host-notify-by-sms' command definition
+		define command{
+			command_name    host-notify-by-sms
+			command_line    /opt/nagios/bin/sms_send.sh "Host $HOSTSTATE$ alert for $HOSTNAME$! on '$TIME$' " $CONTACTPAGER$
+		}
+
+		# 'service notify by sms' command definition
+		define command{
+			command_name    notify-by-sms
+			command_line    /opt/nagios/bin/sms_send.sh "$HOSTADDRESS$ $SERVICEDESC$ is $SERVICESTATE$ on $TIME$" $CONTACTPAGER$
+		}
+		
+		----------------------------------------------------------
+	
+	## 附 mail_send.sh and sms_send.sh
+	(1) mail_send.sh
+		----------------------------------------------------------
+		#!/bin/bash
+
+		cd /opt/nagios/bin
+
+		if [ $# -ne 4 ]; then
+			Subject="$1"
+			AlertInfo="$2"
+			Touser="$3"
+			/usr/bin/python2 /opt/nagios/bin/mail_send.py "$Subject" "$AlertInfo" "$Touser"
+		fi
+
+		# EOF :mail_send.sh
+		----------------------------------------------------------
+
+		## below is the mail_send.py
+		## mail_send.py
+		----------------------------------------------------------
+		# -*- coding: utf-8 -*-
+		import sys,os,re,glob,sys
+		import os.path
+		import smtplib
+		import time,datetime
+		import base64
+		import random
+
+		import email
+		import mimetypes
+		from email.MIMEMultipart import MIMEMultipart
+		from email.MIMEText import MIMEText
+		from email.MIMEImage import MIMEImage
+		#from email import Encoders
+		#from email import Message
+
+		#os.sys.path.append('/webapp/_conf/nagios/')
+
+		#from nagios_conf import visit
+
+
+		#################################################################
+		##    vspMail                                                  ##
+		##    参数列表                                                 ##
+		##    smtp_server                发邮件smtp服务器地址          ##
+		##    from_usr                   发件人地址                    ##
+		##    to_usr                     收件人地址                    ##
+		##    subject                      邮件标题                    ##
+		##    htmlText                        邮件内容                 ##
+		##    auth                       是否需要认证，1为是，0为否    ##
+		##    log_usr                    smtp用户名                    ##
+		##    log_passwd                 smtp密码                      ##
+		##                                                             ##
+		#################################################################
+
+		def nagiosMail(smtp_server,from_usr,to_usr,subject,plainText,htmlText,auth,log_usr,log_passwd):
+			server = smtplib.SMTP(smtp_server)
+			#server.set_debuglevel(1)
+			if auth == 1:
+				server.login(log_usr,log_passwd)
+
+			strFrom = from_usr
+			strTo = to_usr
+			subject="=?GB2312?B?%s?=" % (base64.encodestring(subject)[:-1])
+
+		#   msgRoot = MIMEMultipart('related')
+			msgRoot = MIMEMultipart('alternative')
+			msgRoot['Subject'] = subject
+			msgRoot['From'] = strFrom
+			msgRoot['To'] = strTo
+			msgRoot.preamble = 'This is a multi-part message in MIME format.'
+
+			msgAlternative = MIMEMultipart('alternative')
+			msgAlternative.attach(msgAlternative)
+
+			#设定纯文本信息
+			msgText = MIMEText(plainText, 'plain', 'gbk')
+			msgAlternative.attach(msgText)      # 隐藏文本
+		#   msgRoot.attach(msgText)
+
+			#设定HTML信息
+			msgText = MIMEText(htmlText, 'html', 'gbk')
+			msgRoot.attach(msgText)
+
+			#设定内置图片信息,可以考虑作为取日志的附件的方法
+		#   fp = open('test.jpg', 'rb')
+		#   msgImage = MIMEImage(fp.read())
+		#   fp.close()
+		#   msgImage.add_header('Content-ID', '<image1>')
+		#   msgRoot.attach(msgImage)
+
+			server.sendmail(strFrom, strTo, msgRoot.as_string())
+			server.quit()
+
+
+		class Logger(object):
+			def __init__(self):
+				from time import strftime
+				pid = os.getpid()
+				logtime=strftime('%Y%m%d')
+				self.logfile = '/var/log/nagios/nagios-%s.log' % logtime
+
+			def write(self, err):
+				logline = '%s|%s\n' % (time.asctime(), err)
+				f = file(self.logfile, 'a')
+				f.write(logline)
+				f.close()
+
+		#class mailsend(object,subject,htmlText):
+		def mailsend(*arguments):
+			logger = Logger()
+			subject=arguments[0]
+			htmlText=arguments[1]
+			plainText=arguments[1]
+			touser=arguments[2]
+			#print subject
+			#print htmlText
+			#print plainText
+			#return True
+			#flist=visit()
+			######################################################
+			##
+			##         以下为配置内容
+			##
+			######################################################
+
+			#邮件发送服务器地址
+			smtp_server = 'localhost'
+			#smtp_server = 'smtp.163.com' 
+			#smtp_server = 'abc.com' 
+			#smtp_server = '192.168.0.220' 
+
+			#发一封歇息多久
+			delay = 3
+
+			#smtp服务器是否需要验证
+			#需要验证为1不需要为0
+			auth = 0
+
+			#如果需要验证，请在下面输入用户名和密码
+			log_usr="abcdef"
+			log_passwd="123456"
+
+			#发件人地址
+			from_usr = 'nagios@abc.com'
+
+
+			try:
+
+				tousr=touser.split(",")
+				for to_usr in tousr:
+					print to_usr
+					nagiosMail(smtp_server,from_usr,to_usr,subject,plainText, htmlText,auth,log_usr,log_passwd)
+					logger.write('''Email has been sent to: %s \n''' % (to_usr))
+					time.sleep(delay)
+				logger.write('''......The all logs for nagios has been Finished!!!\n''')
+
+			except IOError:
+				logger.write("Can not open list file please place it in current directory and name it as 'addr-xxx.txt'\n")
+
+		if __name__ == '__main__':
+			logger = Logger()
+			argv = sys.argv
+			subject=argv[1]
+			htmlText=argv[2]
+			touser=argv[3]
+			#subject="**RECOVERY alert - 192.168.0.233/Partition_Webapp is OK **"
+			#htmlText="***** Nagios *****\n\nNotification Type:RECOVERY\n\nService: Partition_Webapp\nHost:192.168.0.233\nAddress: 192.168.0.233\nState:OK\n\nDate/Time: Mon Jul 30 18:24:59 CST 2007\n\nAdditionalInfo:\n\nDISK OK - free space: /webapp 757 MB (54% inode=70%):"
+			print argv
+			try:
+				mailsend(subject,htmlText,touser)
+			except:
+				logger.write('execution failure:' + str(sys.exc_info()[0]))
+				raise
+		----------------------------------------------------------
+		
+	(2) sms_send.sh
+		----------------------------------------------------------
+		#!/bin/bash
+		cd /opt/nagios/bin
+
+		if [ $# -ne 3 ]; then
+			msg="$1"
+			pcode="$2"
+			#echo $msg
+			#echo $pcode
+			/usr/bin/python2 /opt/nagios/bin/sms_send.py "$msg" "$pcode"
+		fi
+		# EOF: sms_send.sh
+		----------------------------------------------------------
+		
+		## below is the sms_send.py
+		## sms_send.py
+		----------------------------------------------------------
+		# -*- coding: utf-8 -*-
+		import time
+		import serial
+		import os,sys
+
+		# s utf8 string
+		# unicode hex string(ASCII)
+		def sm_encode(s):
+			#将utf8字符串转换成unicode串
+			ss = s.decode('utf-8')
+			if len(ss)>70:
+				return 'ERROR0'
+			sss = ''
+			#取每个unicode字符转换成四个十六进制字符（标准ASCII字符串）
+			for c in ss:
+				h = '%04X'%(ord(c))
+				sss+=h
+			#print len(ss)
+			ss_len = len(ss)
+			return '%02X'%(ss_len*2)+sss
+
+		#手机号码编码
+		#  code 手机号
+		def encode_code(code):
+			if len(code)!=13 : return ''
+			code+='F'
+			c = ''
+			for i in range(0,6):
+				c+=code[i*2+1]+code[i*2]
+			c = '91'+c
+			return c
+
+		#  sm pdu:ASCII字符串
+		#  code 对方手机号码
+		#  msg 消息内容（utf8字符串）
+		def pdu(code,msg):
+			r = '08'                        #短信中心号码字节长度(按字节算，包含91）
+			r += encode_code('8613800755500')   #深圳的短信中心号码，其它地方需要替换成当地的短信中心号码
+			r+='F0'
+			r += '11'                       #TP-MTI(2bit)，TP-RD(1bit)，TP-VPF(2bit)
+											#TP-RP（1bit），TP-UDHI(1bit)，TP-SRR(1bit)
+			r += '00'                       #TP-Message-Reference，“00”表示由电话设置该值
+
+			r += '0D'                       #手机号码长度 0x0D=13 十进制 len('8613668888888)
+			r += encode_code(code)          #对方手机号
+			r +='F1'
+			r += '00'                       #协议标识（TP-PID），普通GSM类型，点到点方式
+			r += '08'                       #使用unicode编码（00表示7bit编码）
+			r += '00'                       #生存期，FF表示最大
+
+			r += sm_encode(msg)
+			return r
+
+		#保存短信到手机
+		def save(p):
+			pdu_len = (len(p)-18)/2
+			#print 'AT+CMGW='+str(pdu_len)+'\r'+p+'\x1a'
+
+			#return 
+			try:
+				com = serial.Serial()
+				com.timeout = 5
+				com.port = 0
+				com.baudrate=115200
+				com.open()
+				cmd = 'AT+CMGW='+str(pdu_len)+'\r'
+				#print cmd      
+				com.write(cmd)
+		#       print com.read(512)
+				com.write(p)
+				com.write('\x1a')
+				#print com.read(512)
+				return com.read(512)
+			except Exception,ex:
+		#       print ex
+				return 'ERROR'
+
+		#发送短信
+		def send(p):
+			logger = Logger()
+			pdu_len = (len(p)-18)/2
+			try:
+				com = serial.Serial()
+				com.close()
+
+				com.timeout = 5
+				com.port = 0
+				com.baudrate=115200
+				com.open()
+				if com.isOpen()==True:
+				### Note: AT command's format ###
+					## AT+CMGF=0'+'\r'+'\x1a'+str(pdu_len)+'\r'
+					## This maybe must first send "0'+'\r'+'\x1a'" to AT,like those:(Please reference your GSM/GPRS MODEM)
+					## cmds='AT+CMGF=0'+'\r'+'\x1a'
+					## com.write(cmds)
+					## cmds='AT+CMGS='+str(pdu_len)+'\r'
+					## com.write(cmds)
+
+					cmds='AT+CMGF=0'+'\r'+'\x1a'
+					com.write(cmds)
+					cmds='AT+CMGS='+str(pdu_len)+'\r'
+					com.write(cmds)
+					com.write(p)
+					com.write('\x1a')
+					return com.read(512)
+				else:
+					return 'ERROR1'
+			except Exception,ex:
+				return 'ERROR1'
+
+		class Logger(object):
+			def __init__(self):
+				from time import strftime
+				pid = os.getpid()
+				logtime=strftime('%Y%m%d')
+				self.logfile = '/var/log/nagios/nagios_send_sms-%s.log' % logtime
+
+			def write(self, err):
+				logline = '%s|%s\n' % (time.asctime(), err)
+				f = file(self.logfile, 'a')
+				f.write(logline)
+				f.close()
+
+		def sms_send(msg,pcode):
+			logger = Logger()
+			s=msg
+			## Note: the msg's number must less than 70 
+			pnum=pcode.split(",")
+			for p_num in pnum:
+
+				logger.write('''Msg send to %s\n''' % p_num)
+				p = pdu(str(p_num),s)
+				try:
+					res = send(p)   #发送短信到手机
+					if res.find('ERROR1')>=0:
+						logger.write('''send short message error!\n''')
+					else:
+						pass
+				except Exception,ex:
+					pass
+
+		if __name__=='__main__':
+			argv = sys.argv
+			msg=argv[1]
+			pcode=argv[2]
+			sms_send(msg,pcode)
+
+		----------------------------------------------------------
+
+
+	3) ## 各配置文件需要注意的地方
+		3.1 timeperiod.cfg
+			----------------------------------------------------------
+			define timeperiod{
+				timeperiod_name 24x7
+				......
+				}
+			----------------------------------------------------------
+		3.2 contacts.cfg
+			----------------------------------------------------------
+			define contact{
+				contact_name		nagiosadmin
+				alias				nagiosadmin
+				......
+				service_notification_commands   notify-by-email,notify-by-sms
+				host_notification_commands      host-notify-by-email,host-notify-by-sms
+
+				email                           abc@abc.com,abcd@abc.com,abcef@abc.com
+				pager                           8613688888888,8613888888888
+				}
+			define contactgroup{
+				contactgroup_name   nagios
+				alias           nagios
+				members         nagiosadmin
+				}
+			## 定义管理员成员和管理员组成员,以及管理员的联系方式mail或sms.要注意这里的管理员contact_name必须与htpasswd.user中设定的帐号一致.
+			## 在这里可以设置多个管理员组,将不同的管理员分组,在hosts和services中引用后,可以达到区分各自监控的服务器的目的.
+			----------------------------------------------------------
+		3.3 hosts.cfg
+			----------------------------------------------------------
+			define host{
+				name                            generic-host
+				......
+				}
+			## 定义默认的hosts公共属性.在每台机子的hosts定义中引用
+			----------------------------------------------------------
+		3.4 hostgroups.cfg
+			----------------------------------------------------------
+			define hostgroup{
+					hostgroup_name  nginx
+					alias           nginx
+					members         192.168.0.220,192.168.0.233
+					}
+			define hostgroup{
+					hostgroup_name  apache
+					alias           apache
+					members         192.168.0.220,192.168.0.233
+					}
+			## 定义hosts所属的分组,方便监控时的观察.hostgroup_name定义分组名称,alias为别名,members定义成员名称,内容为每台hosts配置文件中定义的host_name内容
+			----------------------------------------------------------
+		3.5 services.cfg
+			----------------------------------------------------------
+			define service{
+					name                            generic-service 
+				......
+				}
+			## 定义默认的services公共属性,在每个service定义中引用
+			----------------------------------------------------------
+
+
+	4)	etc/servers/abc.com目录下192.168.0.220.cfg
+
+			----------------------------------------------------------
+			define host {
+			use                            generic-host                     ;引用的是hosts.cfg文件中定义的name.
+			host_name                      192.168.0.220                    ;定义所监控的服务器名称.
+			address                        192.168.0.220                    ;定义所监控的服务器的IP地址.
+			check_command                  check-host-alive
+			max_check_attempts             10
+			notification_interval          480
+			notification_period            24x7
+			notification_options           d,u,r
+			contact_groups                 nagios
+			}
+
+			define service{
+					use						generic-service                     ;引用的是services.cfg文件中定义的name.
+					host_name				192.168.0.220                       ;引用上面host中定义的host_name.
+					service_description		PING
+					is_volatile				0
+					check_period			24x7                           ;引用timeperiod.cfg中定义的timeperiod_name. 
+					max_check_attempts		1
+					normal_check_interval	1
+					retry_check_interval	1
+					contact_groups			nagios                       ;引用contacts.cfg中定义的contactgroup_name.
+					notification_options	w,u,c,r
+					notification_interval	240
+					notification_period		24x7
+					check_command			check_ping!100.0,20%!500.0,60%            ;使用commands.cfg中定义的监测命令.
+			}
+			## 该配置文件为最终监控主机的配置文件,包含被监控主机192.168.0.220的定义和需要监控的服务.
+			----------------------------------------------------------
+
+			## 如果有多台主机需要被监控，配置文件类似
+
+
+		## 至此基本的nagios各项配置已经设置完成.
+		/opt/nagios/bin/nagios -v /opt/nagios/etc/nagios.cfg
+		## 执行该命令检查所有配置文件是否正确.如果全部正确显示如下:
+			Total Warnings: 0
+			Total Errors:   0
+
+			Things look okay - No serious problems were detected during the pre-flight check
+
+		## 接着就可以启动nagios监控服务:
+			service nagios start
+		## 检查进程
+			ps aux|grep nagios
+		
+
+6) ndoutils (for mysql)
+	1) Download and install ndoutils
+		wget http://nchc.dl.sourceforge.net/sourceforge/nagios/ndoutils-1.4b4.tar.gz
+		tar zxvf ndoutils-1.4b4.tar.gz
+		cd ndoutils-1.4b4
+		##./configure --with-mysql-lib=/opt/mysql/lib/mysql
+		./configure –enable-mysql –with-mysql-lib=/opt/mysql/lib/mysql –with-mysql-inc=/opt/mysql/include
+		make
+
+	2) install the mysql db
+		(1).  Create a database for storing the data (e.g. 'nagios')
+		(2).  Create a username/password that has at least the following privileges for
+			the database:
+
+			SELECT, INSERT, UPDATE, DELETE
+
+		(3).  Run the DB installation script in the db/ subdirectory of the NDO distribution
+			to create the necessary tables in the database.
+
+			cd db
+			./installdb –u user –p password –h localhost –d database
+
+		(4).  Make sure the database name, prefix, and username/password you just created
+			and setup match the variable specified in the NDO2DB config file (see below).
+
+	3) INSTALLING THE NDOMOD BROKER MODULE
+
+		cp src/ndomod-2x.o /opt/nagios/bin/ndomod.o
+		cp config/ndomod.cfg /opt/nagios/etc/
+
+		## edit the nagios.cfg
+		broker_module=/opt/nagios/bin/ndomod.o config_file=/opt/nagios/etc/ndomod.cfg
+
+		## make sure your nagios.cfg file 
+		event_broker_options=-1
+	
+	4) INSTALLING THE NDO2DB DAEMON
+		cp src/ndo2db-2x /opt/nagios/bin/ndo2db
+		cp config/ndo2db.cfg /opt/nagios/etc
+
+		### Start the daemon running!  An init script will be developed soon...
+
+		/opt/nagios/bin/ndo2db -c /opt/nagios/etc/ndo2db.cfg
+
+
+7) The nrpe for client:
+	
+	1. config the server ,suppose the ip: 192.168.0.220
+
+	## Edit commands.cfg
+	## Add below:
+		# 'check_nrpe' command definition
+		define command{
+				command_name check_nrpe
+				command_line /opt/nagios/libexec/check_nrpe -H $HOSTADDRESS$ -c $ARG1$
+		}
+	
+	## nagios.cfg set
+		check_external_commands=1
+
+	Service nagios reload
+
+	2. install and config the client ,suppose the ip: 192.168.0.233
+	## add user and group :nagios
+		2.1) install and config the nrpe
+			cd /appstore/pkg/nagios
+			tar xzvf nrpe-2.8.1.tar.gz
+			cd nrpe-2.8.1
+			./configure --enable-ssl --enable-command-args.
+			.
+			*** Configuration summary for nrpe 2.8.1 08-16-2007 ***:
+
+			 General Options:
+			 -------------------------
+			 NRPE port:  5666
+			 NRPE user:  nagios
+			 NRPE group: nagios
+
+			Review the options above for accuracy.  If they look okay,
+			type 'make all' to compile the NRPE daemon and client.
+
+				make all
+				cp sample-config/nrpe.cfg /etc/
+				cp src/nrpe /usr/sbin/
+		2.2) install and config the nagios-plugins
+			tar-xzvf nagios-plugins-1.4.9.tar.gz
+			./configure –prefix=/opt/nagios
+			make all
+			make install
+			cd /opt/nagios
+			chown  –R nagios /opt/nagios
+
+			## config nrpe
+			## edit /etc/nrpe.cfg:
+			dont_blame_nrpe=1
+			command[check_http_nginx]=/opt/nagios/libexec/check_http -H 192.168.0.234 -p 8082
+			command[check_http_lighty]=/opt/nagios/libexec/check_http -H 192.168.0.233 -p 8888
+			command[check_http]=/opt/nagios/libexec/check_http -H 192.168.0.234
+			command[check_users]=/opt/nagios/libexec/check_users -w 5 -c 10
+			command[check_load]=/opt/nagios/libexec/check_load -w 15,10,5 -c 30,25,20
+			command[check_diskR]=/opt/nagios/libexec/check_disk -w 20% -c 10% -p /
+			command[check_diskV]=/opt/nagios/libexec/check_disk -w 20% -c 10% -p /var
+			command[check_diskA]=/opt/nagios/libexec/check_disk -w 20% -c 10% -p /appstore
+			command[check_diskW]=/opt/nagios/libexec/check_disk -w 20% -c 10% -p /webapp
+			command[check_diskM]=/opt/nagios/libexec/check_disk -w 20% -c 10% -p /mysql
+			command[check_zombie_procs]=/opt/nagios/libexec/check_procs -w 5 -c 10 -s Z
+			command[check_total_procs]=/opt/nagios/libexec/check_procs -w 150 -c 200
+			command[check_mysql]=/opt/nagios/libexec/check_mysql -H 192.168.0.233 -u yourname -p yourpasswd
+
+		2.3) config nrpe to xinetd 
+			vi /etc/services
+				nrpe            5666/tcp
+			cd /etc/xinetd.d
+			vi nrpe
+			## add below
+			
+			# default: on
+			# description: NRPE
+					service nrpe
+					{
+							disable         = no
+							flags           = REUSE
+							socket_type     = stream
+							wait            = no
+							user            = nagios
+							server          = /usr/sbin/nrpe
+							server_args     = -c /etc/nrpe.cfg --inetd
+							log_on_failure  += USERID             
+							only_from       = 192.168.0.220		#nagios server's IP
+					}
+			## start nrpe
+			/etc/rc.d/init.d/xinetd restart
+			netstat –nlp|grep 5666
+
+	3. server 192.168.0.220 install the script check_nrpe:
+		cd /appstore/pkg/nagios
+		tar xzvf nrpe-2.8.1.tar.gz
+		cd nrpe-2.8.1
+		./configure --enable-ssl --enable-command-args.
+		make all
+			cp sample-config/nrpe.cfg /etc/
+			cp src/nrpe /usr/sbin/
+			cp src/check_nrpe /opt/nagios/libexec
+
+		3.1) ## edit /etc/nrpe.cfg
+			allowed_hosts=127.0.0.1,192.168.0.233
+		3.2) ## now you can add the 192.168.0.233.cfg under /opt/nagios/etc/servers/abc.com/ ,like below:
+			define host {
+			use                            generic-host                     ;引用的是hosts.cfg文件中定义的name.
+			host_name                      192.168.0.233                    ;定义所监控的服务器名称.
+			address                        192.168.0.233                    ;定义所监控的服务器的IP地址.
+			check_command                  check-host-alive
+			max_check_attempts             10
+			notification_interval          480
+			notification_period            24x7
+			notification_options           d,u,r
+			contact_groups                 nagios
+			}
+
+			define service{
+					use                 generic-service
+					host_name           192.168.0.233
+					service_description         HTTP
+					is_volatile             0
+					check_period            24x7
+					max_check_attempts      1
+					normal_check_interval       1
+					retry_check_interval        1
+					contact_groups          nagios
+					notification_options        w,u,c,r
+					notification_interval       240
+					notification_period         24x7
+					check_command           check_nrpe!check_http
+			}
+
+			define service{
+					use                 generic-service
+					host_name           192.168.0.233
+					service_description         Partition_var
+					is_volatile             0
+					check_period            24x7
+					max_check_attempts      1
+					normal_check_interval       1
+					retry_check_interval        1
+					contact_groups          nagios
+					notification_options        w,u,c,r
+					notification_interval       240
+					notification_period         24x7
+					check_command           check_nrpe!check_diskV
+			}
+			......
+## 注意，所有的与nagios需要处理的部分，均需要nagios权限才能正常运行，包括短信部分需要调用的串口/dev/ttyS0都要增加nagios权限
+
